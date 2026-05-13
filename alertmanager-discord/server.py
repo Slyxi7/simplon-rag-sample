@@ -48,7 +48,7 @@ class AlertHandler(BaseHTTPRequestHandler):
             }
 
             payload = json.dumps(
-                {"username": "Alertmanager", "embeds": [embed]}
+                {"embeds": [embed]}
             ).encode("utf-8")
 
             req = urllib.request.Request(

@@ -30,5 +30,3 @@ groups:
           summary: "Taux d'erreur 5xx élevé"
           description: "Plus de 5% des requêtes retournent un 5xx (valeur actuelle: {{ $value | printf \"%.2f\" }})"
           runbook_url: "runbooks/high-error-rate.md"
-
-      
