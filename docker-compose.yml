@@ -135,21 +135,7 @@ services:
       - "9094:9094"
     restart: unless-stopped
 
-  langfuse-cost-exporter:
-    build:
-      context: ./jobs
-      dockerfile: Dockerfile.cost-exporter
-    container_name: simplon_rag_langfuse_cost_exporter
-    environment:
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-    ports:
-      - "8001:8001"
-    restart: unless-stopped
-    profiles:
-      - langfuse  # Only start when langfuse is enabled
-
+  
   frontend:
     build:
       context: ./frontend

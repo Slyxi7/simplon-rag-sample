@@ -31,13 +31,4 @@ groups:
           description: "Plus de 5% des requêtes retournent un 5xx (valeur actuelle: {{ $value | printf \"%.2f\" }})"
           runbook_url: "runbooks/high-error-rate.md"
 
-      # Alerte 3 — Budget LLM journalier dépassé
-      - alert: LLMDailyBudgetExceeded
-        expr: llm_daily_cost_euros > 15
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Budget LLM journalier dépassé"
-          description: "Le coût LLM quotidien dépasse 15€ (actuel: {{ $value | printf \"%.2f\" }}€). Risque de dépassement budget."
-          runbook_url: "runbooks/llm-budget-exceeded.md"
+      

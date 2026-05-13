@@ -18,8 +18,4 @@ scrape_configs:
     scrape_interval: 10s
     scrape_timeout: 5s
 
-  - job_name: 'langfuse-cost-exporter'
-    static_configs:
-      - targets: ['langfuse-cost-exporter:8001']
-    scrape_interval: 60s
-    scrape_timeout: 10s
+  
