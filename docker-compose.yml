@@ -55,6 +55,12 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: loki
+      options:
+        loki-url: http://host.docker.internal:3100/loki/api/v1/push
+        loki-batch-size: "400"
+        loki-external-labels: container_name=simplon_rag_api,job=api
 
   prometheus:
     image: prom/prometheus:v2.47.0
@@ -69,11 +75,80 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./api/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules.yml:/etc/prometheus/rules.yml
       - prometheus_data:/prometheus
     depends_on:
       - api
+      - alertmanager
     restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: simplon_rag_loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: simplon_rag_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: simplon_rag_alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+
+  discord-webhook:
+    build:
+      context: ./alertmanager-discord
+    container_name: simplon_rag_discord_webhook
+    environment:
+      DISCORD_WEBHOOK: ${DISCORD_WEBHOOK_URL:-https://discord.com/api/webhooks/CHANGE_ME}
+      LISTEN_PORT: "9094"
+    ports:
+      - "9094:9094"
+    restart: unless-stopped
+
+  langfuse-cost-exporter:
+    build:
+      context: ./jobs
+      dockerfile: Dockerfile.cost-exporter
+    container_name: simplon_rag_langfuse_cost_exporter
+    environment:
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    profiles:
+      - langfuse  # Only start when langfuse is enabled
 
   frontend:
     build:
@@ -91,9 +166,17 @@ services:
     volumes:
       - ./frontend:/app
     restart: unless-stopped
+    logging:
+      driver: loki
+      options:
+        loki-url: http://host.docker.internal:3100/loki/api/v1/push
+        loki-batch-size: "400"
+        loki-external-labels: container_name=simplon_rag_frontend,job=frontend
 
 volumes:
   pgdata:
   api_data_docs:
   api_data_eval:
   prometheus_data:
+  grafana_data:
+  loki_data:

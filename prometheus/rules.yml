@@ -1,0 +1,43 @@
+groups:
+  - name: simplon_rag_alerts
+    rules:
+      # Alerte 1 — Latence p95 trop haute sur /messages
+      - alert: HighLatencyMessages
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{endpoint="messages"}[5m])) by (le)
+          ) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latence p95 élevée sur /messages"
+          description: "La latence p95 sur /messages dépasse 5s depuis 2 min (valeur actuelle: {{ $value | printf \"%.2f\" }}s)"
+          runbook_url: "runbooks/high-latency-messages.md"
+
+      # Alerte 2 — Taux d'erreur 5xx élevé
+      - alert: HighErrorRate5xx
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taux d'erreur 5xx élevé"
+          description: "Plus de 5% des requêtes retournent un 5xx (valeur actuelle: {{ $value | printf \"%.2f\" }})"
+          runbook_url: "runbooks/high-error-rate.md"
+
+      # Alerte 3 — Budget LLM journalier dépassé
+      - alert: LLMDailyBudgetExceeded
+        expr: llm_daily_cost_euros > 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Budget LLM journalier dépassé"
+          description: "Le coût LLM quotidien dépasse 15€ (actuel: {{ $value | printf \"%.2f\" }}€). Risque de dépassement budget."
+          runbook_url: "runbooks/llm-budget-exceeded.md"
