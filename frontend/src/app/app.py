@@ -8,6 +8,11 @@ import streamlit as st
 
 from app.api_client import create_conversation, send_message
 from app.config import API_BASE_URL
+from app.logging import setup_frontend_logging, get_logger
+
+# Setup logging
+setup_frontend_logging()
+logger = get_logger("app")
 
 # --- Page config (must be first Streamlit call) ---
 st.set_page_config(
@@ -70,16 +75,29 @@ st.markdown(
 # --- Session initialisation ---
 if "conversation_id" not in st.session_state:
     try:
+        logger.info(
+            "Creating new conversation",
+            extra={"event": "conversation_create_start"}
+        )
         st.session_state.conversation_id = create_conversation(API_BASE_URL)
         st.session_state.messages = []
-    except (httpx.ConnectError, httpx.ConnectTimeout):
-        st.error("Impossible de joindre l'API. Vérifiez que le serveur FastAPI est démarré.")  # noqa: E501
-        st.stop()
-    except httpx.ReadTimeout:
-        st.error("L'API a mis trop de temps à répondre. Rafraîchissez la page pour réessayer.")
-        st.stop()
-    except Exception:
-        st.error("Erreur inattendue lors de la création de la conversation.")
+        logger.info(
+            "Conversation created successfully",
+            extra={
+                "event": "conversation_created",
+                "conversation_id": st.session_state.conversation_id
+            }
+        )
+    except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+        logger.error(
+            "API connection failed",
+            extra={
+                "event": "connection_error",
+                "error_type": type(e).__name__
+            },
+            exc_info=True
+        )
+        st.error("Impossible de joindre l'API. Vérifiez que le serveur FastAPI est démarré.")
         st.stop()
 
 # --- Render conversation history ---

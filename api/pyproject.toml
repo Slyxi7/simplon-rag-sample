@@ -5,6 +5,8 @@ description = "Sample RAG support chatbot"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "prometheus-client>=0.20.0",
+    "python-json-logger>=2.0.7",
     # Evaluation
     "ragas>=0.4.3",
     # LLM & agent framework

@@ -1,6 +1,15 @@
 import json
 import re
 
+from rag.metrics import (
+    guard_route_decisions,
+    escalations_total,
+    evaluation_scores,
+    evaluation_decisions,
+    retrieved_chunks_count,
+    time_node
+)
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from sqlalchemy import select
@@ -60,6 +69,7 @@ async def load_history(state: AgentState, db: AsyncSession) -> dict:
     return {"messages": lc_messages}
 
 
+@time_node("guard_route")
 async def guard_route(state: AgentState) -> dict:
     """Single LLM call that decides scope and retrieval routing simultaneously.
 
@@ -88,6 +98,10 @@ async def guard_route(state: AgentState) -> dict:
         needs_retrieval = True
         category = ""
 
+    # Record guard route decision
+    decision = "in_scope" if in_scope else "out_of_scope"
+    guard_route_decisions.labels(decision=decision).inc()
+
     if not in_scope:
         return {
             "in_scope": False,
@@ -100,6 +114,7 @@ async def guard_route(state: AgentState) -> dict:
     return {"in_scope": True, "needs_retrieval": needs_retrieval, "category": category}
 
 
+@time_node("retrieve")
 async def retrieve(state: AgentState, db: AsyncSession) -> dict:
     """Retrieve relevant chunks from pgvector.
 
@@ -108,9 +123,14 @@ async def retrieve(state: AgentState, db: AsyncSession) -> dict:
     """
     query = state.get("rewrite_suggestion") or state["user_message"]
     chunks = await pgvector_retriever.similarity_search(query, db)
+    
+    # Record number of chunks retrieved
+    retrieved_chunks_count.observe(len(chunks))
+    
     return {"retrieved_chunks": chunks}
 
 
+@time_node("generate")
 async def generate(state: AgentState) -> dict:
     """Generate an answer using the local Ollama chat model, with optional retrieved context.
 
@@ -157,6 +177,7 @@ async def generate(state: AgentState) -> dict:
     }
 
 
+@time_node("evaluate")
 async def evaluate(state: AgentState) -> dict:
     """Evaluate the quality of the generated answer and decide routing.
 
@@ -195,6 +216,14 @@ async def evaluate(state: AgentState) -> dict:
 
     retry_count = state.get("retry_count", 0) + 1
 
+    # Record evaluation metrics
+    evaluation_scores.observe(score)
+    evaluation_decisions.labels(decision=decision).inc()
+
+    # Record escalations
+    if decision == "escalate":
+        escalations_total.inc()
+
     return {
         "eval_score": score,
         "eval_decision": decision,
@@ -203,6 +232,7 @@ async def evaluate(state: AgentState) -> dict:
     }
 
 
+@time_node("escalate")
 async def escalate(state: AgentState) -> dict:
     """Set a human-escalation answer when the evaluator cannot find a satisfactory response."""
     settings = get_settings()
@@ -215,6 +245,7 @@ async def escalate(state: AgentState) -> dict:
     }
 
 
+@time_node("save_turn")
 async def save_turn(state: AgentState, db: AsyncSession) -> dict:
     """Persist user message and assistant answer to the DB."""
     user_msg = Message(
