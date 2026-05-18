@@ -1,0 +1,34 @@
+Post-mortem — Latence élevée sur les messages du chatbot
+Date : 2026-05-18
+Durée : 5 minutes
+Sévérité : warning
+Impact : des retards de réponse
+
+Résumé en 3 lignes
+La latence p95 sur /messages dépasse 5s depuis 2 min
+
+Timeline (UTC)
+14:35:00 - Alerte HighLatencyMessages déclenchée (latence p95 > 5s depuis 2min)
+14:40:00 - Notification Discord envoyée (severity: warning)
+
+Détection (alerte auto / signalement ?)
+Alerte automatique via discord HighLatencyMessages
+
+Root cause technique (sans blâmer une personne)
+Saturation pool de connexions PostgreSQL lors d'ingestion massive de documents combinée au trafic chat normal. Pool par défaut 05 connexions insuffisant pour charge concurrente.
+
+Ce qui a bien / mal fonctionné
+Bien fonctionné : Alerte Prometheus précise, notification Discord immédiate, dashboard Grafana
+Mal fonctionné : Pool de connexions PostgreSQL trop petit pour charge concurrente
+
+Actions correctives (owners + dates)
+[ ] Prévention   — @infra-team — 2026-05-25
+    Configuration infrastructure pour éviter récurrence
+[ ] Détection    — @monitoring-team — 2026-05-22
+    Amélioration monitoring pour détection plus précoce
+[ ] Mitigation   — @backend-team — 2026-05-20
+    Solution immédiate pour limiter l'impact
+[ ] Remédiation  — @backend-team — 2026-05-20
+    Correction directe du problème identifié
+[ ] Résilience   — @infra-team — 2026-05-31
+    Solution long terme pour robustesse système
